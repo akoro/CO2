@@ -1,15 +1,16 @@
 #include <FS.h>
 #include <ArduinoJson.h>
 #include "data.h"
+
 #include "auth.h" // здесь токен, имя сети и пароль
 
 Cfg cfg = {
-  BLYNK,     // Токен проекта 6351a704ef664d43ba2c308c6b7b1515
-  SSID,      // Имя сети WiFi
-  PASSW,     // Пароль сети WiFi
-  15,        //
-  877/4.035, //
-  10         // timeout
+  BLYNK_TOKEN, // Токен проекта 6351a704ef664d43ba2c308c6b7b1515
+  SSID,        // Имя сети WiFi
+  PASSW,       // Пароль сети WiFi
+  15,          //
+  877/4.035,   //
+  10           // timeout
 };
 
 // Loads the configuration from a file
