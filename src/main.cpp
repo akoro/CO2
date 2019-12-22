@@ -86,6 +86,11 @@ BLYNK_WRITE(V5)
   Indicator(param.asInt());
 }
 
+BLYNK_WRITE(V7)
+{
+  if (param.asInt()) ESP.restart();
+}
+
 // This function will run every time Blynk connection is established
 BLYNK_CONNECTED() 
 {
