@@ -8,6 +8,7 @@
 Версия 0.1 2019.11.04
            2019.12.01
            2019.12.17 updates
+           2020.11.15 updates
 */
 
 #include <Adafruit_Sensor.h>
@@ -17,7 +18,7 @@
 #include <SimpleTimer.h>
 #include <SoftwareSerial.h>
 #include <BlynkSimpleEsp8266.h>
-#include <FS.h>
+#include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Bounce2.h>
 #include <console.h>
@@ -307,10 +308,169 @@ void drawBoot(char* msg)
   u8g2.sendBuffer();
 } 
 
+// разбор консольных команд
+
+void _test_(ArgList& L, Stream& S)
+{
+  String p;
+  int i=0;
+  while(!(p = L.getNextArg()).isEmpty())
+    S.printf("arg%d = \"%s\"\n", i++, p.c_str());
+}
+
+// форматирование файловой системы
+void _format_(ArgList& L, Stream& S)
+{
+  S.print(F("Formatting..."));
+  LittleFS.format();
+  S.println(F(" done"));
+}
+
+// задать SSID сети
+void _ssid_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p != "")
+  {
+    memset(cfg.ssid, 0, sizeof(cfg.ssid));
+    strlcpy(cfg.ssid, p.c_str(), p.length()+1);
+  }
+  S.printf("SSID: \"%s\"\r\n", cfg.ssid);
+}
+
+// задать пароль сети
+void _passw_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p != "")
+  {
+    memset(cfg.pass, 0, sizeof(cfg.pass));
+    strlcpy(cfg.pass, p.c_str(), p.length()+1);
+  }
+  S.printf("Password: \"%s\"\r\n", cfg.pass);
+}
+
+// задать идентификатор проекта (токен)
+void _token_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p.length()==32)
+  {
+    memset(cfg.auth, 0, sizeof(cfg.auth));
+    strlcpy(cfg.auth, p.c_str(), 33);
+  }
+  else
+  {
+    S.println(F("token must have 32 simbols"));
+  }
+  S.printf("token: \"%s\"\r\n", cfg.auth);
+}
+
+// задать период измерений
+void _period_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p.length())
+  {
+    int i = p.toInt();
+    if(i>=10 && i<=60)
+      cfg.Period = i;
+    else
+      S.println(F("! Period should be in range 10...60"));
+  }
+  S.printf("Period = %ds\r\n", cfg.Period);
+}
+  
+// задать время соединения к WiFi
+void _timeout_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p.length())
+  {
+    int i = p.toInt();
+    if(i>=1 && i<=20)
+      cfg.Timeout = i;
+    else
+      S.println(F("! Timeout should be in range 1...20"));
+  }
+  S.printf("Timeout = %ds\r\n", cfg.Timeout);
+}
+  
+// калибровка АЦП
+void _volt_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p.length())
+  {
+    float v = p.toFloat();
+    if(v>=2.9 && v<=5.0)
+    {
+      int s = 0;
+      const int n=16;
+      for(int i=0; i<n; i++)
+        s += analogRead(A0);
+      cfg.Coeff_V = (float)s/n/v;
+    }
+    else
+      S.println(F("! Voltage should be in range 2.9...5.0V"));
+  }
+  S.printf("Coeff_V=%0.5f\r\n", cfg.Coeff_V);
+}
+
+// сохранить параметры
+void _save_(ArgList& L, Stream& S)
+{
+  saveConfiguration(cfg_name);
+  S.println(F("Configuration saved"));
+}
+  
+// вывести конфигурационный файл
+void _type_(ArgList& L, Stream& S)
+{
+  printFile(cfg_name);
+}
+
+// сброс
+void _reset_(ArgList& L, Stream& S)
+{
+  ESP.restart();
+}
+  
+// информация о системе
+void _info_(ArgList& L, Stream& S)
+{
+  S.printf("ID: Chip:%08X, Flash:%08X CPU f=%dMHz\r\n", ESP.getChipId(), ESP.getFlashChipId(), ESP.getCpuFreqMHz());
+  S.printf("SDK: %s, Core: %s\r\n",ESP.getSdkVersion(), ESP.getCoreVersion().c_str());
+  S.printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
+  S.print(F("Compiled at ")); Serial.println(F(__TIMESTAMP__));
+}
+  
+// вкл./выкл. индикатор
+void _ind_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  Indicator(p == "1");
+}
+
+Console con;
+
 void setup() 
 {
   // Init serial ports
   Serial.begin(115200);
+
+  con.onCmd("test", _test_);
+  con.onCmd("volt", _volt_);
+  con.onCmd("ssid", _ssid_);
+  con.onCmd("passw", _passw_);
+  con.onCmd("token", _token_);
+  con.onCmd("format",_format_);
+  con.onCmd("save",_save_);
+  con.onCmd("type",_type_);
+  con.onCmd("reset",_reset_);
+  con.onCmd("ind",_ind_);
+  con.onCmd("info",_info_);
+  
   swSer.begin(9600);
 
   // Power ON of CO2 sensor
@@ -318,13 +478,13 @@ void setup()
   digitalWrite(CO2_POW, LOW);
 
   // Init file system and load configuration
-  if(!SPIFFS.begin()) 
+  if(!LittleFS.begin()) 
   {
-    Serial.println(F("Failed to mount SPIFFS. Formatting..."));
-    SPIFFS.format();
+    Serial.println(F("Failed to mount LittleFS. Formatting..."));
+    LittleFS.format();
   }
-  Serial.println(F("SPIFFS is ready."));
-  if(SPIFFS.exists(cfg_name))
+  Serial.println(F("LittleFS is ready."));
+  if(LittleFS.exists(cfg_name))
   {
     loadConfiguration(cfg_name);
     Serial.println(F("Config loaded"));
@@ -410,165 +570,10 @@ void setup()
 
   DoMeasurements();
   
-  Serial.print('>');  // консоль
+  con.begin();
+  con.start();
 }
 
-// проверка команды и выделение параметров
-static bool command(const String& T, String& L, String& P)
-{
-  if(L.startsWith(T))
-  {
-    P = L.substring(L.indexOf(' '));
-    P.trim();
-    return true;
-  }
-  return false;
-}
-
-// разбор консольных команд
-static void Parsing(String& L)
-{
-  String Par;
-  
-  // форматирование файловой системы
-  if(command("format", L, Par))
-  {
-    Serial.print(F("Formatting..."));
-    SPIFFS.format();
-    Serial.println(F(" done"));
-  }
-  
-  // тест
-  else if(command("test", L, Par))
-  {
-    if(Par.length())
-    {
-      Serial.print('[');Serial.print(Par);Serial.println(']');
-    }
-  }
-
-  // задать SSID сети
-  else if(command("ssid", L, Par))
-  {
-    if(Par.length())
-    {
-      memset(cfg.ssid, 0, sizeof(cfg.ssid));
-      strlcpy(cfg.ssid, Par.c_str(), Par.length()+1);
-    }
-    Serial.printf("SSID: \"%s\"\r\n", cfg.ssid);
-  }
-  
-  // задать пароль сети
-  else if(command("pass", L, Par))
-  {
-    if(Par.length())
-    {
-      memset(cfg.pass, 0, sizeof(cfg.pass));
-      strlcpy(cfg.pass, Par.c_str(), Par.length()+1);
-    }
-    Serial.printf("Password: \"%s\"\r\n", cfg.pass);
-  }
-  
-  // задать идентификатор проекта (токен)
-  else if(command("token", L, Par))
-  {
-    if(Par.length()==32)
-    {
-      memset(cfg.auth, 0, sizeof(cfg.auth));
-      strlcpy(cfg.auth, Par.c_str(), 33);
-    }
-    else
-    {
-      Serial.println(F("token must have 32 simbols"));
-    }
-    Serial.printf("token: \"%s\"\r\n", cfg.auth);
-  }
-  
-  // задать период измерений
-  else if(command("period", L, Par))
-  {
-    if(Par.length())
-    {
-      int i = Par.toInt();
-      if(i>=10 && i<=60)
-        cfg.Period = i;
-      else
-        Serial.println(F("! Period should be in range 10...60"));
-    }
-    Serial.printf("Period = %ds\r\n", cfg.Period);
-  }
-  
-  // задать время соединения к WiFi
-  else if(command("timeout", L, Par))
-  {
-    if(Par.length())
-    {
-      int i = Par.toInt();
-      if(i>=1 && i<=20)
-        cfg.Timeout = i;
-      else
-        Serial.println(F("! Timeout should be in range 1...20"));
-    }
-    Serial.printf("Timeout = %ds\r\n", cfg.Timeout);
-  }
-  
-  // калибровка АЦП
-  else if(command("volt", L, Par))
-  {
-    if(Par.length())
-    {
-      float v = Par.toFloat();
-      if(v>=2.9 && v<=5.0)
-      {
-        int s = 0;
-        const int n=16;
-        for(int i=0; i<n; i++)
-          s += analogRead(A0);
-        cfg.Coeff_V = (float)s/n/v;
-      }
-      else
-        Serial.println(F("! Voltage should be in range 2.9...5.0V"));
-    }
-    Serial.printf("Coeff_V=%0.5f\r\n", cfg.Coeff_V);
-  }
-  
-  // сохранить параметры
-  else if(command("save", L, Par))
-  {
-    saveConfiguration(cfg_name);
-    Serial.println(F("Configuration saved"));
-  }
-  // вывести конфигурационный файл
-  else if(command("type", L, Par))
-  {
-    printFile(cfg_name);
-  }
-  // сброс
-  else if(command("reset", L, Par))
-  {
-    ESP.restart();
-  }
-  
-  // информация о системе
-  else if(command("info", L, Par))
-  {
-    Serial.printf("ID: Chip:%08X, Flash:%08X CPU f=%dMHz\r\n", ESP.getChipId(), ESP.getFlashChipId(), ESP.getCpuFreqMHz());
-    Serial.printf("SDK: %s, Core: %s\r\n",ESP.getSdkVersion(), ESP.getCoreVersion().c_str());
-    Serial.printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
-    Serial.print(F("Compiled at ")); Serial.println(F(__TIMESTAMP__));
-  }
-  
-  // вкл./выкл. индикатор
-  else if(command("ind", L, Par))
-  {
-    Indicator(Par == "1");
-  }
-  else
-  {
-    Serial.print("? ");
-    Serial.println(L);
-  }
-}
 
 void loop() 
 {
@@ -581,27 +586,5 @@ void loop()
     Indicator(true);
   }
 
-  if(Serial.available())
-  {
-    char c = Serial.read();
-    if((c>=' ') && (c<127)) // ввод команды
-    {
-      Line += c;
-      Serial.write(c);
-    }
-    else if(c == '\r') // команда принята,
-    {
-      Serial.write('\r'); Serial.write('\n');
-      Line.trim();
-      if(Line != "")
-        Parsing(Line); // разбор команды
-      Line = "";
-      Serial.print(">");
-    }
-    else if(Line.length()!=0 && ((c == '\b')||(c == 127))) // забой
-    {
-      Line.remove(Line.length()-1);
-      Serial.write("\b \b");
-    }
-  }
+  con.run();
 }
