@@ -10,7 +10,8 @@ Cfg cfg = {
   PASSW,       // Пароль сети WiFi
   15,          //
   877/4.035,   //
-  10           // timeout
+  10,          // timeout
+  0.0          // T comp
 };
 
 // Loads the configuration from a file
@@ -39,6 +40,7 @@ void loadConfiguration(const char *filename)
   cfg.Period  = doc["Period"];
   cfg.Coeff_V = doc["Coeff_V"];
   cfg.Timeout = doc["Timeout"];
+  cfg.TComp   = doc["T-comp"];
   
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -69,6 +71,7 @@ void saveConfiguration(const char *filename)
   doc["Period"]  = cfg.Period;
   doc["Coeff_V"] = cfg.Coeff_V;
   doc["Timeout"] = cfg.Timeout;
+  doc["T-comp"]  = cfg.TComp;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) 
@@ -102,7 +105,7 @@ void printFile(const char *filename, Stream& S)
   file.close();
 }
 
-float Kalman::Filter(float A)
+float Filter1::Filter(float A)
 {
   v = k*A + (1-k)*v;
   return v;

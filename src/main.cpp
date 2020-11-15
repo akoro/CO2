@@ -47,10 +47,10 @@ float Humidity    = 0;
 float Temperature = 0;
 float Voltage     = 0;
 
-Kalman FPressure(750);
-Kalman FTemperature(25);
-Kalman FHumidity(30);
-Kalman FVoltage(4.0);
+//Filter1 FPressure(750);
+//Filter1 FTemperature(25);
+//Filter1 FHumidity(30);
+Filter1 FVoltage(4.0);
 
 Bounce Button1, Button2;
 Console con;
@@ -152,10 +152,15 @@ void readCO2()
 
 void readBME280(void)
 {
-  bme.takeForcedMeasurement();
-  Humidity    = FHumidity.Filter(bme.readHumidity());
-  Pressure    = FPressure.Filter(bme.readPressure());
-  Temperature = FTemperature.Filter(bme.readTemperature());
+  if(bme.takeForcedMeasurement())
+  {
+//    Humidity    = FHumidity.Filter(bme.readHumidity());
+//    Pressure    = FPressure.Filter(bme.readPressure());
+//    Temperature = FTemperature.Filter(bme.readTemperature());
+    Humidity    = bme.readHumidity();
+    Pressure    = bme.readPressure();
+    Temperature = bme.readTemperature();
+  }
 }
 
 void CheckPower(void)
@@ -205,7 +210,7 @@ void draw(int Progress)
   u8g2.drawStr(x, y, buff);
   y = y + 2 + u8g2.getAscent() - u8g2.getDescent();
   x = 0;
-  sprintf(buff, "V=%0.2f", Voltage);
+  sprintf(buff, "V=%0.2f\r\n", Voltage);
   
   // счётчик времени
   u8g2.drawStr(x, y, buff);
@@ -259,7 +264,8 @@ void DoMeasurements()
     if(!con.busy())
     {
       Serial.printf("CO2: %d\r\n", co2);
-      Serial.printf("BME280: h=%0.0f p=%0.1f t=%0.1f\r\n", Humidity,Pressure,Temperature);
+      Serial.printf("BME280: h=%0.0f p=%0.1f t=%0.1f\r\n", Humidity,Pressure*Coeff_P,Temperature);
+      Serial.printf("V=%0.2f", Voltage);
     }
 
     if(Blynk.connected())
@@ -416,6 +422,18 @@ void _volt_(ArgList& L, Stream& S)
   S.printf("Coeff_V=%0.5f\r\n", cfg.Coeff_V);
 }
 
+void _tcomp_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p.length())
+  {
+    float v = p.toFloat();
+    cfg.TComp = v;
+    bme.setTemperatureCompensation(v);
+  }
+  S.printf("Tc=%0.1f\r\n", bme.getTemperatureCompensation());
+}
+
 // сохранить параметры
 void _save_(ArgList& L, Stream& S)
 {
@@ -455,6 +473,8 @@ void setup()
 {
   // Init serial ports
   Serial.begin(115200);
+  Serial.println();
+  Serial.println(F("Room environment meter V1"));
 
   con.onCmd("test", _test_);
   con.onCmd("volt", _volt_);
@@ -467,6 +487,7 @@ void setup()
   con.onCmd("reset",_reset_);
   con.onCmd("ind",_ind_);
   con.onCmd("info",_info_);
+  con.onCmd("tcomp",_tcomp_);
   
   swSer.begin(9600);
 
@@ -499,7 +520,7 @@ void setup()
 
   // Init I2C interface
   Wire.begin(I2C_SDA, I2C_SCL);
-  Serial.println(F("\r\nI2C OK"));
+  Serial.println(F("I2C OK"));
   
   // Init display
   u8g2.begin();
@@ -512,6 +533,16 @@ void setup()
   if(bme.begin(0x76))
   {
     Serial.println(F("OK"));
+    bme.setTemperatureCompensation(cfg.TComp);
+    bme.setSampling(
+      Adafruit_BME280::MODE_FORCED,
+      Adafruit_BME280::SAMPLING_X16,
+      Adafruit_BME280::SAMPLING_X16,
+      Adafruit_BME280::SAMPLING_X16,
+      Adafruit_BME280::FILTER_X16,
+      Adafruit_BME280::STANDBY_MS_0_5
+      );
+    delay(100);
   }
   else
     Serial.println(F("fail"));
@@ -525,7 +556,6 @@ void setup()
 
   // Init Blynk
   Blynk.config(cfg.auth);
-
 
   WiFi.mode(WIFI_STA);
   WiFi.persistent(false);
