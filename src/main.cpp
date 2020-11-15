@@ -265,7 +265,7 @@ void DoMeasurements()
     {
       Serial.printf("CO2: %d\r\n", co2);
       Serial.printf("BME280: h=%0.0f p=%0.1f t=%0.1f\r\n", Humidity,Pressure*Coeff_P,Temperature);
-      Serial.printf("V=%0.2f", Voltage);
+      Serial.printf("V=%0.2f\r\n", Voltage);
     }
 
     if(Blynk.connected())
@@ -280,8 +280,7 @@ void DoMeasurements()
  
     if(IndicationPeriod)
     {
-      IndicationPeriod--;
-      if(IndicationPeriod == 0)
+      if(--IndicationPeriod == 0)
         Indicator(false);
     }
   }
@@ -295,7 +294,7 @@ void DoMeasurements()
 
 void drawBoot(char const * msg) 
 {
-  static byte x,y;
+  static uint8_t x=0, y;
   if(*msg=='\0')
   {
     u8g2.clearBuffer();
@@ -306,9 +305,15 @@ void drawBoot(char const * msg)
   else
   {
     bool f = *msg == '+';
-    if(f) msg++;
+    if(f) 
+      msg++;
     u8g2.drawStr(x, y, msg);
-    if(f) y = y + 2 + u8g2.getAscent() - u8g2.getDescent();
+    x = x + u8g2.getStrWidth(msg);
+    if(f) 
+    {
+      x = 0;
+      y = y + 2 + u8g2.getAscent() - u8g2.getDescent();
+    }
   }
   u8g2.sendBuffer();
 } 
@@ -476,18 +481,20 @@ void setup()
   Serial.println();
   Serial.println(F("Room environment meter V1"));
 
-  con.onCmd("test", _test_);
-  con.onCmd("volt", _volt_);
-  con.onCmd("ssid", _ssid_);
-  con.onCmd("passw", _passw_);
-  con.onCmd("token", _token_);
-  con.onCmd("format",_format_);
-  con.onCmd("save",_save_);
-  con.onCmd("type",_type_);
-  con.onCmd("reset",_reset_);
-  con.onCmd("ind",_ind_);
-  con.onCmd("info",_info_);
-  con.onCmd("tcomp",_tcomp_);
+  con.onCmd("test",    _test_);
+  con.onCmd("volt",    _volt_);
+  con.onCmd("ssid",    _ssid_);
+  con.onCmd("passw",   _passw_);
+  con.onCmd("token",   _token_);
+  con.onCmd("format",  _format_);
+  con.onCmd("save",    _save_);
+  con.onCmd("type",    _type_);
+  con.onCmd("reset",   _reset_);
+  con.onCmd("ind",     _ind_);
+  con.onCmd("info",    _info_);
+  con.onCmd("tcomp",   _tcomp_);
+  con.onCmd("period",  _period_);
+  con.onCmd("timeout", _timeout_);
   
   swSer.begin(9600);
 
@@ -592,10 +599,10 @@ void setup()
     drawBoot("Blynk");
     delay(1000);
   } 
-  // Setup a function to be called every 1 second
-  timer.setInterval(1000L, DoMeasurements);
 
   DoMeasurements();
+  // Setup a function to be called every 1 second
+  timer.setInterval(1000L, DoMeasurements);
   
   con.begin();
   con.start();
