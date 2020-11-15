@@ -14,7 +14,7 @@ extern Cfg cfg;
 
 void loadConfiguration(const char *filename);
 void saveConfiguration(const char *filename);
-void printFile(const char *filename);
+void printFile(const char *filename, Stream& S);
 
 class Kalman
 {

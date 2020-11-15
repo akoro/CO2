@@ -15,7 +15,6 @@
 #include <Adafruit_BME280.h>
 #include <Wire.h>
 #include <U8g2lib.h>
-#include <SimpleTimer.h>
 #include <SoftwareSerial.h>
 #include <BlynkSimpleEsp8266.h>
 #include <LittleFS.h>
@@ -54,11 +53,11 @@ Kalman FHumidity(30);
 Kalman FVoltage(4.0);
 
 Bounce Button1, Button2;
+Console con;
 
 static bool  Indication    = true;
 static const float Coeff_P = 760.0/101325.0; // mm Hg
 static int IndicationPeriod = 3; // сколько периодов измерения включён индикатор
-static String Line = "";
 bool isFirstConnect = true; // Keep this flag not to re-sync on every reconnection
 
 void draw(int);
@@ -257,7 +256,7 @@ void DoMeasurements()
     readCO2();
     readBME280();
     
-    if(Line.length()==0)
+    if(!con.busy())
     {
       Serial.printf("CO2: %d\r\n", co2);
       Serial.printf("BME280: h=%0.0f p=%0.1f t=%0.1f\r\n", Humidity,Pressure,Temperature);
@@ -288,7 +287,7 @@ void DoMeasurements()
 
 }
 
-void drawBoot(char* msg) 
+void drawBoot(char const * msg) 
 {
   static byte x,y;
   if(*msg=='\0')
@@ -427,7 +426,7 @@ void _save_(ArgList& L, Stream& S)
 // вывести конфигурационный файл
 void _type_(ArgList& L, Stream& S)
 {
-  printFile(cfg_name);
+  printFile(cfg_name, S);
 }
 
 // сброс
@@ -451,8 +450,6 @@ void _ind_(ArgList& L, Stream& S)
   String p = L.getNextArg();
   Indicator(p == "1");
 }
-
-Console con;
 
 void setup() 
 {

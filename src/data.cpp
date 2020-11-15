@@ -1,4 +1,4 @@
-#include <FS.h>
+#include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "data.h"
 
@@ -17,7 +17,7 @@ Cfg cfg = {
 void loadConfiguration(const char *filename) 
 {
   // Open file for reading
-  File file = SPIFFS.open(filename,"r");
+  File file = LittleFS.open(filename,"r");
 
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
@@ -50,7 +50,7 @@ void loadConfiguration(const char *filename)
 void saveConfiguration(const char *filename) 
 {
   // Open file for writing
-  File file = SPIFFS.open(filename, "w");
+  File file = LittleFS.open(filename, "w");
   if (!file) 
   {
     Serial.println(F("Failed to create file"));
@@ -81,22 +81,22 @@ void saveConfiguration(const char *filename)
 }
 
 // Prints the content of a file to the Serial
-void printFile(const char *filename) 
+void printFile(const char *filename, Stream& S) 
 {
   // Open file for reading
-  File file = SPIFFS.open(filename,"r");
+  File file = LittleFS.open(filename,"r");
   if (!file) 
   {
-    Serial.println(F("Failed to read file"));
+    S.println(F("Failed to read file"));
     return;
   }
 
   // Extract each characters by one by one
   while (file.available()) 
   {
-    Serial.print((char)file.read());
+    S.print((char)file.read());
   }
-  Serial.println();
+  S.println();
 
   // Close the file
   file.close();
