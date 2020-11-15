@@ -585,6 +585,5 @@ void loop()
   {
     Indicator(true);
   }
-
   con.run();
 }
