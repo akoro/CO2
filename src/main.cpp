@@ -9,6 +9,7 @@
            2019.12.01
            2019.12.17 updates
            2020.11.15 updates
+           2020.11.17 telned added
 */
 
 #include <Adafruit_Sensor.h>
@@ -21,6 +22,7 @@
 #include <ArduinoJson.h>
 #include <Bounce2.h>
 #include <console.h>
+#include "TelnetServer.h"
 
 #include "data.h"
 
@@ -34,6 +36,8 @@ const char *cfg_name = "/config";
 #define CO2_TX  13
 #define BUT1     0
 #define BUT2    14
+
+#define IND_P    4
 
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, I2C_SCL, I2C_SDA, U8X8_PIN_NONE);
 SoftwareSerial swSer(CO2_TX, CO2_RX, false);
@@ -54,10 +58,11 @@ Filter1 FVoltage(4.0);
 
 Bounce Button1, Button2;
 Console con;
+Telnet  tel;
 
 static bool  Indication    = true;
 static const float Coeff_P = 760.0/101325.0; // mm Hg
-static int IndicationPeriod = 3; // сколько периодов измерения включён индикатор
+static int IndicationPeriod = IND_P; // сколько периодов измерения включён индикатор
 bool isFirstConnect = true; // Keep this flag not to re-sync on every reconnection
 
 void draw(int);
@@ -70,7 +75,7 @@ void Indicator(const bool E)
   {
     u8g2.setPowerSave(0);
     Serial.println(F("display ON"));
-    IndicationPeriod = 3;
+    IndicationPeriod = IND_P;
   }
   else
   {
@@ -452,10 +457,15 @@ void _type_(ArgList& L, Stream& S)
   printFile(cfg_name, S);
 }
 
-// сброс
-void _reset_(ArgList& L, Stream& S)
+// измерение
+void _meas_(ArgList& L, Stream& S)
 {
-  ESP.restart();
+  Voltage = FVoltage.Filter(analogRead(A0) / cfg.Coeff_V);
+  readCO2();
+  readBME280();
+  S.printf("CO2: %d\r\n", co2);
+  S.printf("BME280: h=%0.0f p=%0.1f t=%0.1f\r\n", Humidity,Pressure*Coeff_P,Temperature);
+  S.printf("V=%0.2f\r\n", Voltage);
 }
   
 // информация о системе
@@ -489,12 +499,22 @@ void setup()
   con.onCmd("format",  _format_);
   con.onCmd("save",    _save_);
   con.onCmd("type",    _type_);
-  con.onCmd("reset",   _reset_);
   con.onCmd("ind",     _ind_);
   con.onCmd("info",    _info_);
   con.onCmd("tcomp",   _tcomp_);
   con.onCmd("period",  _period_);
   con.onCmd("timeout", _timeout_);
+  con.onCmd("reset",   [](ArgList&, Stream& S){ESP.reset();});
+
+  tel.onCmd("save",    _save_);
+  tel.onCmd("ind",     _ind_);
+  tel.onCmd("info",    _info_);
+  tel.onCmd("tcomp",   _tcomp_);
+  tel.onCmd("period",  _period_);
+  tel.onCmd("mea",     _meas_);
+  tel.onCmd("reset",   [](ArgList&, Stream& S){ESP.reset();});
+  tel.onCmd("exit",    [](ArgList&, Stream& S){tel.exit();});
+  tel.onUnknown([](String& L, Stream& S){S.print("! Unknown command: ");S.println(L);});
   
   swSer.begin(9600);
 
@@ -604,6 +624,7 @@ void setup()
   // Setup a function to be called every 1 second
   timer.setInterval(1000L, DoMeasurements);
   
+  tel.begin();
   con.begin();
   con.start();
 }
@@ -615,9 +636,10 @@ void loop()
   Button2.update();
   Blynk.run(); 
   timer.run();
-  if(Button1.fell())
+  if(Button1.fallingEdge())
   {
     Indicator(true);
   }
   con.run();
+  tel.run();
 }
