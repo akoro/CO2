@@ -474,7 +474,7 @@ void _info_(ArgList& L, Stream& S)
   S.printf("ID: Chip:%08X, Flash:%08X CPU f=%dMHz\r\n", ESP.getChipId(), ESP.getFlashChipId(), ESP.getCpuFreqMHz());
   S.printf("SDK: %s, Core: %s\r\n",ESP.getSdkVersion(), ESP.getCoreVersion().c_str());
   S.printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
-  S.print(F("Compiled at ")); Serial.println(F(__TIMESTAMP__));
+  S.print(F("Compiled at ")); S.println(F(__TIMESTAMP__));
 }
   
 // вкл./выкл. индикатор
@@ -624,6 +624,7 @@ void setup()
   // Setup a function to be called every 1 second
   timer.setInterval(1000L, DoMeasurements);
   
+  tel.setPrompt("-->");
   tel.begin();
   con.begin();
   con.start();
