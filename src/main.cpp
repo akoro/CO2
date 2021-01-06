@@ -9,7 +9,7 @@
            2019.12.01
            2019.12.17 updates
            2020.11.15 updates
-           2020.11.17 telned added
+           2020.11.17 telnet added
 */
 
 #include <Adafruit_Sensor.h>
