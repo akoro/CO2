@@ -4,14 +4,18 @@
 
 #include "auth.h" // здесь токен, имя сети и пароль
 
+#define JBUFSIZE 512
+
 Cfg cfg = {
-  BLYNK_TOKEN, // Токен проекта 6351a704ef664d43ba2c308c6b7b1515
+  MQTT_SERVER, // MQTT сервер
   SSID,        // Имя сети WiFi
   PASSW,       // Пароль сети WiFi
+  MQTT_ID,
   15,          //
   877/4.035,   //
   10,          // timeout
-  0.0          // T comp
+  0.0,         // T comp
+  1833         // mqtt_port
 };
 
 // Loads the configuration from a file
@@ -23,7 +27,7 @@ void loadConfiguration(const char *filename)
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/v6/assistant to compute the capacity.
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<JBUFSIZE> doc;
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
@@ -32,15 +36,18 @@ void loadConfiguration(const char *filename)
 
   // Copy values from the JsonDocument to the Config
   memset(cfg.ssid,0,sizeof(cfg.ssid));
-  memset(cfg.pass,0,sizeof(cfg.pass));
-  memset(cfg.auth,0,sizeof(cfg.auth));
   strcpy(cfg.ssid, (const char*)doc["SSID"]);
+  memset(cfg.pass,0,sizeof(cfg.pass));
   strcpy(cfg.pass, (const char*)doc["Passw"]);
-  strcpy(cfg.auth, (const char*)doc["Auth"]);
-  cfg.Period  = doc["Period"];
-  cfg.Coeff_V = doc["Coeff_V"];
-  cfg.Timeout = doc["Timeout"];
-  cfg.TComp   = doc["T-comp"];
+  memset(cfg.mqtt_server,0,sizeof(cfg.mqtt_server));
+  strcpy(cfg.mqtt_server, (const char*)doc["MQTT_server"]);
+  memset(cfg.mqtt_id,0,sizeof(cfg.mqtt_id));
+  strcpy(cfg.mqtt_id, (const char*)doc["MQTT_ID"]);
+  cfg.period  = doc["Period"];
+  cfg.coeff_v = doc["Coeff_V"];
+  cfg.timeout = doc["Timeout"];
+  cfg.tcomp   = doc["T-comp"];
+  cfg.mqtt_port = doc["Port"];
   
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -62,16 +69,18 @@ void saveConfiguration(const char *filename)
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<JBUFSIZE> doc;
 
   // Set the values in the document
-  doc["Auth"]    = cfg.auth;
-  doc["SSID"]    = cfg.ssid;
-  doc["Passw"]   = cfg.pass;
-  doc["Period"]  = cfg.Period;
-  doc["Coeff_V"] = cfg.Coeff_V;
-  doc["Timeout"] = cfg.Timeout;
-  doc["T-comp"]  = cfg.TComp;
+  doc["MQTT_server"] = cfg.mqtt_server;
+  doc["MQTT_ID"]     = cfg.mqtt_id;
+  doc["SSID"]        = cfg.ssid;
+  doc["Passw"]       = cfg.pass;
+  doc["Period"]      = cfg.period;
+  doc["Coeff_V"]     = cfg.coeff_v;
+  doc["Timeout"]     = cfg.timeout;
+  doc["T-comp"]      = cfg.tcomp;
+  doc["Port"]        = cfg.mqtt_port;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) 

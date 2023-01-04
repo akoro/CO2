@@ -2,13 +2,15 @@
 
 struct Cfg
 {
-  char auth[36];
+  char mqtt_server[40];
   char ssid[32];
   char pass[32];
-  int Period;
-  float Coeff_V;
-  int Timeout;
-  float TComp;
+  char mqtt_id[40];
+  int period;
+  float coeff_v;
+  int timeout;
+  float tcomp;
+  uint16_t mqtt_port;
 };
 
 extern Cfg cfg;

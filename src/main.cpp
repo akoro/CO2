@@ -10,14 +10,16 @@
            2019.12.17 updates
            2020.11.15 updates
            2020.11.17 telnet added
+           2023.01.04 go to MQTT...
 */
 
+#include <ESP8266WiFi.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <SoftwareSerial.h>
-#include <BlynkSimpleEsp8266.h>
+#include <PubSubClient.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Bounce2.h>
@@ -42,7 +44,9 @@ const char *cfg_name = "/config";
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, I2C_SCL, I2C_SDA, U8X8_PIN_NONE);
 SoftwareSerial swSer(CO2_TX, CO2_RX, false);
 Adafruit_BME280 bme;
-SimpleTimer timer;
+
+WiFiClient    client;
+PubSubClient  mqtt(client);
 
 // Sensors data
 int   co2         = -1;
@@ -70,7 +74,6 @@ void draw(int);
 void Indicator(const bool E)
 {
   Indication = E;
-  Blynk.virtualWrite(V5, Indication);
   if(Indication)
   {
     u8g2.setPowerSave(0);
@@ -83,27 +86,6 @@ void Indicator(const bool E)
     Serial.println(F("display OFF"));
     IndicationPeriod = 0;
     draw(0);
-  }
-}
-
-BLYNK_WRITE(V5)
-{
-  Indicator(param.asInt());
-}
-
-BLYNK_WRITE(V7)
-{
-  if (param.asInt()) ESP.restart();
-}
-
-// This function will run every time Blynk connection is established
-BLYNK_CONNECTED() 
-{
-  if (isFirstConnect) 
-  {
-    // Request Blynk server to re-send latest values for all pins
-    Blynk.syncAll();
-    isFirstConnect = false;
   }
 }
 
@@ -170,7 +152,7 @@ void readBME280(void)
 
 void CheckPower(void)
 {
-  Voltage = FVoltage.Filter(analogRead(A0) / cfg.Coeff_V);
+  Voltage = FVoltage.Filter(analogRead(A0) / cfg.coeff_v);
   if(Voltage > 3.7)
   {
     digitalWrite(CO2_POW, HIGH);
@@ -181,7 +163,7 @@ void CheckPower(void)
     u8g2.setPowerSave(1);
     char buff[30];
     sprintf(buff, "V=%0.2fV", Voltage);
-    Blynk.email("Voltage low", buff);
+//    Blynk.email("Voltage low", buff);
     ESP.deepSleep(600000000); // засыпаем на 10 минут
   }
 }
@@ -247,7 +229,7 @@ void draw(int Progress)
   // Соединение
   x=119;
   y=0;
-  if(Blynk.connected())
+//  if(Blynk.connected())
   {
     const byte bm[8] = {0xFF,0x00,0x7E,0x00,0x3C,0x00,0x18,0x18};
     u8g2.drawBitmap(x,y,1,8,bm);
@@ -256,10 +238,10 @@ void draw(int Progress)
   u8g2.sendBuffer();
 }
 
-void DoMeasurements() 
+bool DoMeasurements() 
 {
   static int Counter = 0;
-  if(++Counter == cfg.Period)
+  if(++Counter == cfg.period)
   {
     Counter = 0;
     CheckPower();
@@ -273,28 +255,35 @@ void DoMeasurements()
       Serial.printf("V=%0.2f\r\n", Voltage);
     }
 
-    if(Blynk.connected())
-    {
-      Blynk.virtualWrite(V1, Humidity);
-      Blynk.virtualWrite(V2, Temperature);
-      Blynk.virtualWrite(V3, Pressure*Coeff_P);
-      if(co2 > 0)  
-        Blynk.virtualWrite(V4, co2);
-      Blynk.virtualWrite(V6, Voltage);
-    }
- 
     if(IndicationPeriod)
     {
       if(--IndicationPeriod == 0)
         Indicator(false);
     }
+    return true;
   }
 
   if(Indication)
   {
-    draw(Counter*100/cfg.Period);
+    draw(Counter*100/cfg.period);
   }
+  return false;
+}
 
+
+void publish(void)
+{
+  char buff[30];
+  sprintf(buff, "%0.1f", Temperature);
+  mqtt.publish("base/state/temperature",buff);
+  sprintf(buff, "%0.0f", Humidity);
+  mqtt.publish("base/state/humidity",buff);
+  sprintf(buff, "%0.2f", Voltage);
+  mqtt.publish("base/state/volt",buff);
+  sprintf(buff, "%0.2f", Pressure*Coeff_P);
+  mqtt.publish("base/state/pressure",buff);
+  sprintf(buff, "%d", co2);
+  mqtt.publish("base/state/co2",buff);
 }
 
 void drawBoot(char const * msg) 
@@ -323,7 +312,30 @@ void drawBoot(char const * msg)
   u8g2.sendBuffer();
 } 
 
-// разбор консольных команд
+void reconnect() 
+{
+  // Loop until we're reconnected
+  while (!mqtt.connected()) 
+  {
+    Serial.print("Attempting MQTT connection...");
+    // Connect to MQTT Broker
+    if(mqtt.connect(cfg.mqtt_id)) 
+    {
+      Serial.println("connected");
+//      mqtt.subscribe("aqua/relay/led1");
+//      mqtt.subscribe("aqua/relay/valve");
+    } 
+    else 
+    {
+      Serial.print("failed, rc=");
+      Serial.print(mqtt.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);      // Wait 5 seconds before retrying
+    }
+  }
+}
+
+/****** разбор консольных команд ************************************************/
 
 void _test_(ArgList& L, Stream& S)
 {
@@ -365,20 +377,28 @@ void _passw_(ArgList& L, Stream& S)
   S.printf("Password: \"%s\"\r\n", cfg.pass);
 }
 
-// задать идентификатор проекта (токен)
-void _token_(ArgList& L, Stream& S)
+// задать адрес брокера
+void _serv_(ArgList& L, Stream& S)
 {
   String p = L.getNextArg();
-  if(p.length()==32)
+  if(p.length())
   {
-    memset(cfg.auth, 0, sizeof(cfg.auth));
-    strlcpy(cfg.auth, p.c_str(), 33);
+    memset(cfg.mqtt_server, 0, sizeof(cfg.mqtt_server));
+    strlcpy(cfg.mqtt_server, p.c_str(), sizeof(cfg.mqtt_server));
   }
-  else
+  S.printf("MQTT server: \"%s\"\r\n", cfg.mqtt_server);
+}
+
+// задать идентификатор клиента
+void _id_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  if(p.length())
   {
-    S.println(F("token must have 32 simbols"));
+    memset(cfg.mqtt_id, 0, sizeof(cfg.mqtt_id));
+    strlcpy(cfg.mqtt_id, p.c_str(), sizeof(cfg.mqtt_id));
   }
-  S.printf("token: \"%s\"\r\n", cfg.auth);
+  S.printf("Server id: \"%s\"\r\n", cfg.mqtt_id);
 }
 
 // задать период измерений
@@ -389,11 +409,11 @@ void _period_(ArgList& L, Stream& S)
   {
     int i = p.toInt();
     if(i>=10 && i<=60)
-      cfg.Period = i;
+      cfg.period = i;
     else
       S.println(F("! Period should be in range 10...60"));
   }
-  S.printf("Period = %ds\r\n", cfg.Period);
+  S.printf("Period = %ds\r\n", cfg.period);
 }
   
 // задать время соединения к WiFi
@@ -404,11 +424,11 @@ void _timeout_(ArgList& L, Stream& S)
   {
     int i = p.toInt();
     if(i>=1 && i<=20)
-      cfg.Timeout = i;
+      cfg.timeout = i;
     else
       S.println(F("! Timeout should be in range 1...20"));
   }
-  S.printf("Timeout = %ds\r\n", cfg.Timeout);
+  S.printf("Timeout = %ds\r\n", cfg.timeout);
 }
   
 // калибровка АЦП
@@ -424,12 +444,12 @@ void _volt_(ArgList& L, Stream& S)
       const int n=16;
       for(int i=0; i<n; i++)
         s += analogRead(A0);
-      cfg.Coeff_V = (float)s/n/v;
+      cfg.coeff_v = (float)s/n/v;
     }
     else
       S.println(F("! Voltage should be in range 2.9...5.0V"));
   }
-  S.printf("Coeff_V=%0.5f\r\n", cfg.Coeff_V);
+  S.printf("Coeff_V=%0.5f\r\n", cfg.coeff_v);
 }
 
 void _tcomp_(ArgList& L, Stream& S)
@@ -438,7 +458,7 @@ void _tcomp_(ArgList& L, Stream& S)
   if(p.length())
   {
     float v = p.toFloat();
-    cfg.TComp = v;
+    cfg.tcomp = v;
     bme.setTemperatureCompensation(v);
   }
   S.printf("Tc=%0.1f\r\n", bme.getTemperatureCompensation());
@@ -460,7 +480,7 @@ void _type_(ArgList& L, Stream& S)
 // измерение
 void _meas_(ArgList& L, Stream& S)
 {
-  Voltage = FVoltage.Filter(analogRead(A0) / cfg.Coeff_V);
+  Voltage = FVoltage.Filter(analogRead(A0) / cfg.coeff_v);
   readCO2();
   readBME280();
   S.printf("CO2: %d\r\n", co2);
@@ -484,18 +504,33 @@ void _ind_(ArgList& L, Stream& S)
   Indicator(p == "1");
 }
 
+/********************************************************************************************************/
+
+void callback(char* topic, byte* payload, unsigned int length) 
+{
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) 
+  {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+}
+
 void setup() 
 {
   // Init serial ports
   Serial.begin(115200);
   Serial.println();
-  Serial.println(F("Room environment meter V1"));
+  Serial.println(F("Room environment meter V1.5"));
 
   con.onCmd("test",    _test_);
   con.onCmd("volt",    _volt_);
   con.onCmd("ssid",    _ssid_);
   con.onCmd("passw",   _passw_);
-  con.onCmd("token",   _token_);
+  con.onCmd("serv",    _serv_);
+  con.onCmd("id",      _id_);
   con.onCmd("format",  _format_);
   con.onCmd("save",    _save_);
   con.onCmd("type",    _type_);
@@ -538,7 +573,7 @@ void setup()
     Serial.println(F("Default config"));
   
   // Check power
-  Voltage = analogRead(A0) / cfg.Coeff_V;
+  Voltage = analogRead(A0) / cfg.coeff_v;
   if(Voltage < 3.2)
   {
     ESP.deepSleep(600000000); // засыпаем на 10 минут
@@ -560,7 +595,7 @@ void setup()
   if(bme.begin(0x76))
   {
     Serial.println(F("OK"));
-    bme.setTemperatureCompensation(cfg.TComp);
+    bme.setTemperatureCompensation(cfg.tcomp);
     bme.setSampling(
       Adafruit_BME280::MODE_FORCED,
       Adafruit_BME280::SAMPLING_X16,
@@ -581,8 +616,6 @@ void setup()
   Button2.attach(BUT2);
   Button2.interval(30);
 
-  // Init Blynk
-  Blynk.config(cfg.auth);
 
   WiFi.mode(WIFI_STA);
   WiFi.persistent(false);
@@ -591,7 +624,7 @@ void setup()
     drawBoot("+WiFi");
     Serial.print("Connecting WiFi ");
     WiFi.begin(cfg.ssid, cfg.pass);
-    int timeout = cfg.Timeout;
+    int timeout = cfg.timeout;
     while (WiFi.status() != WL_CONNECTED && timeout) 
     {
       delay(1000);
@@ -608,21 +641,14 @@ void setup()
     else
     {
       Serial.print(F(" connected ")); Serial.println(WiFi.localIP());
-      Blynk.connect(5000);
+//      Blynk.connect(5000);
       drawBoot("+connected");
     }
   }
-
-  if(Blynk.connected())
-  {
-    Serial.println(F("Blynk connected"));
-    drawBoot("Blynk");
-    delay(1000);
-  } 
-
+  
+  mqtt.setServer(cfg.mqtt_server, 1883);
+  mqtt.setCallback(callback);
   DoMeasurements();
-  // Setup a function to be called every 1 second
-  timer.setInterval(1000L, DoMeasurements);
   
   tel.setPrompt("-->");
   tel.begin();
@@ -630,17 +656,28 @@ void setup()
   con.start();
 }
 
-
 void loop() 
 {
   Button1.update();
   Button2.update();
-  Blynk.run(); 
-  timer.run();
-  if(Button1.fallingEdge())
-  {
+
+  if(Button1.fallingEdge())  
     Indicator(true);
-  }
+
   con.run();
   tel.run();
+
+  if (!mqtt.connected())  
+    reconnect();
+
+  mqtt.loop();
+
+  static uint32_t last = 0;
+  uint32_t now = millis();
+  if (now - last > 1000) 
+  {
+    last = now;
+    if(DoMeasurements())
+      publish();
+  }
 }
