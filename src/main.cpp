@@ -312,29 +312,6 @@ void drawBoot(char const * msg)
   u8g2.sendBuffer();
 } 
 
-void reconnect() 
-{
-  // Loop until we're reconnected
-  while (!mqtt.connected()) 
-  {
-    Serial.print("Attempting MQTT connection...");
-    // Connect to MQTT Broker
-    if(mqtt.connect(cfg.mqtt_id)) 
-    {
-      Serial.println("connected");
-//      mqtt.subscribe("aqua/relay/led1");
-//      mqtt.subscribe("aqua/relay/valve");
-    } 
-    else 
-    {
-      Serial.print("failed, rc=");
-      Serial.print(mqtt.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000);      // Wait 5 seconds before retrying
-    }
-  }
-}
-
 /****** разбор консольных команд ************************************************/
 
 void _test_(ArgList& L, Stream& S)
@@ -658,6 +635,7 @@ void setup()
 
 void loop() 
 {
+  static int t = 0;
   Button1.update();
   Button2.update();
 
@@ -667,10 +645,29 @@ void loop()
   con.run();
   tel.run();
 
-  if (!mqtt.connected())  
-    reconnect();
+  if (!mqtt.connected())
+  if(millis()-t > 5000)
+  {
+    Serial.print("Attempting MQTT connection...");
+    // Connect to MQTT Broker
+    if(mqtt.connect(cfg.mqtt_id)) 
+    {
+      Serial.println("connected");
+//      mqtt.subscribe("aqua/relay/led1");
+//      mqtt.subscribe("aqua/relay/valve");
+    } 
+    else 
+    {
+      Serial.print("failed, rc=");
+      Serial.print(mqtt.state());
+      Serial.println(" try again in 5 seconds");
+      t = millis();
+      return;
+    }
+  }
 
-  mqtt.loop();
+  if(mqtt.connected()) 
+    mqtt.loop();
 
   static uint32_t last = 0;
   uint32_t now = millis();
@@ -678,6 +675,7 @@ void loop()
   {
     last = now;
     if(DoMeasurements())
-      publish();
+      if(mqtt.connected()) 
+        publish();
   }
 }
