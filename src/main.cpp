@@ -296,7 +296,10 @@ void publish(void)
   mqtt.publish("base/state/pressure",buff);
   sprintf(buff, "%d", co2);
   mqtt.publish("base/state/co2",buff);
-  sprintf(buff, "%0.2f", DPress*Coeff_P);
+  if(DPress > 0)
+    sprintf(buff, "+%0.2f", DPress*Coeff_P);
+  else
+    sprintf(buff, "%0.2f", DPress*Coeff_P);
   mqtt.publish("base/state/dpr",buff);
 //  mqtt.publish("base/update", "0");
 }
