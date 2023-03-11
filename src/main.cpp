@@ -48,17 +48,26 @@ Adafruit_BME280 bme;
 WiFiClient    client;
 PubSubClient  mqtt(client);
 
-// Sensors data
+// Датчики (Станция-2)
 int   co2         = -1;
 float Pressure    = 0;
 float Humidity    = 0;
 float Temperature = 0;
 float Voltage     = 0;
+float DPress      = 0;
+
+// Данные Станции-1
+float Temperature1 = 0;
+float Temperature2 = 0;
+float Humidity2    = 0;
+float Volage2      = 0;
 
 //Filter1 FPressure(750);
 //Filter1 FTemperature(25);
 //Filter1 FHumidity(30);
 Filter1 FVoltage(4.0);
+
+TDelta delta;
 
 Bounce Button1, Button2;
 Console con;
@@ -247,12 +256,15 @@ bool DoMeasurements()
     CheckPower();
     readCO2();
     readBME280();
+    DPress = Pressure - delta.update(Pressure);
     
     if(!con.busy())
     {
       Serial.printf("CO2: %d\r\n", co2);
-      Serial.printf("BME280: h=%0.0f p=%0.1f t=%0.1f\r\n", Humidity,Pressure*Coeff_P,Temperature);
+      Serial.printf("BME280: h=%0.0f p=%0.2f t=%0.1f\r\n", Humidity, Pressure*Coeff_P, Temperature);
+      Serial.printf("dP=%0.2f\r\n", DPress*Coeff_P);
       Serial.printf("V=%0.2f\r\n", Voltage);
+//      delta.print();
     }
 
     if(IndicationPeriod)
@@ -284,6 +296,9 @@ void publish(void)
   mqtt.publish("base/state/pressure",buff);
   sprintf(buff, "%d", co2);
   mqtt.publish("base/state/co2",buff);
+  sprintf(buff, "%0.2f", DPress*Coeff_P);
+  mqtt.publish("base/state/dpr",buff);
+//  mqtt.publish("base/update", "0");
 }
 
 void drawBoot(char const * msg) 
@@ -653,7 +668,7 @@ void loop()
     if(mqtt.connect(cfg.mqtt_id)) 
     {
       Serial.println("connected");
-//      mqtt.subscribe("aqua/relay/led1");
+      mqtt.subscribe("base/update");
 //      mqtt.subscribe("aqua/relay/valve");
     } 
     else 

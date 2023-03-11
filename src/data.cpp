@@ -54,7 +54,6 @@ void loadConfiguration(const char *filename)
 }
 
 
-
 // Saves the configuration to a file
 void saveConfiguration(const char *filename) 
 {
@@ -120,3 +119,23 @@ float Filter1::Filter(float A)
   return v;
 }
 
+TDelta::TDelta()
+{
+  for(int i=0; i<CNT; i++) data[i]=0;
+  idx = 0;
+}
+
+float TDelta::update(float V)
+{
+  if(idx == CNT-1)
+  {
+    data[idx]=V;
+    idx = 0;
+  }
+  else
+  {
+    data[idx]=V;
+    idx++;
+  }
+  return data[idx];
+}
