@@ -119,6 +119,8 @@ float Filter1::Filter(float A)
   return v;
 }
 
+/************************************************/
+
 TDelta::TDelta()
 {
   for(int i=0; i<CNT; i++) data[i]=0;
@@ -127,15 +129,10 @@ TDelta::TDelta()
 
 float TDelta::update(float V)
 {
+  data[idx] = V;
   if(idx == CNT-1)
-  {
-    data[idx]=V;
     idx = 0;
-  }
   else
-  {
-    data[idx]=V;
     idx++;
-  }
   return data[idx];
 }

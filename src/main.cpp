@@ -282,25 +282,24 @@ bool DoMeasurements()
   return false;
 }
 
-
 void publish(void)
 {
-  char buff[30];
+  char buff[40];
   sprintf(buff, "%0.1f", Temperature);
-  mqtt.publish("base/state/temperature",buff);
+  mqtt.publish("base/state/temperature", buff);
   sprintf(buff, "%0.0f", Humidity);
-  mqtt.publish("base/state/humidity",buff);
+  mqtt.publish("base/state/humidity", buff);
   sprintf(buff, "%0.2f", Voltage);
-  mqtt.publish("base/state/volt",buff);
+  mqtt.publish("base/state/volt", buff);
   sprintf(buff, "%0.2f", Pressure*Coeff_P);
-  mqtt.publish("base/state/pressure",buff);
+  mqtt.publish("base/state/pressure", buff);
   sprintf(buff, "%d", co2);
-  mqtt.publish("base/state/co2",buff);
+  mqtt.publish("base/state/co2", buff);
   if(DPress > 0)
     sprintf(buff, "+%0.2f", DPress*Coeff_P);
   else
     sprintf(buff, "%0.2f", DPress*Coeff_P);
-  mqtt.publish("base/state/dpr",buff);
+  mqtt.publish("base/state/dpr", buff);
 //  mqtt.publish("base/update", "0");
 }
 
