@@ -120,19 +120,37 @@ float Filter1::Filter(float A)
 }
 
 /************************************************/
+#define RTCOFFSET 32
 
-TDelta::TDelta()
-{
-  for(int i=0; i<CNT; i++) data[i]=0;
-  idx = 0;
-}
 
 float TDelta::update(float V)
 {
-  data[idx] = V;
+//  data[idx] = V;
+  uint32_t idx;
+  uint32_t CNT;
+  ESP.rtcUserMemoryRead(RTCOFFSET, &CNT, 4);
+  ESP.rtcUserMemoryRead(RTCOFFSET+4, &idx, 4);
+  ESP.rtcUserMemoryWrite(RTCOFFSET+4+4+4*idx, (uint32_t*)&V, 4);
   if(idx == CNT-1)
     idx = 0;
   else
     idx++;
-  return data[idx];
+  ESP.rtcUserMemoryWrite(RTCOFFSET+4, &idx, 4);
+  ESP.rtcUserMemoryRead(RTCOFFSET+4+4+4*idx, (uint32_t*)&V, 4);
+  return V;
+//  return data[idx];
 }
+
+uint32_t TDelta::init(uint32_t C)
+{
+  float V = 0;
+  uint32_t i = 0;
+  ESP.rtcUserMemoryWrite(RTCOFFSET, &C, 4);
+  ESP.rtcUserMemoryWrite(RTCOFFSET+4, &i, 4);
+  for(i=0; i<C; i++)
+    ESP.rtcUserMemoryWrite(RTCOFFSET+4+4+4*i, (uint32_t*)&V, 4);
+  C = 0;
+  ESP.rtcUserMemoryRead(RTCOFFSET, &C, 4);
+  return C;
+}
+

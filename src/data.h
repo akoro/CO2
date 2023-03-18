@@ -33,12 +33,7 @@ class Filter1
 
 class TDelta
 {
-  private:
-    static const int CNT = 60;
-    float data[CNT];
-    int idx;
   public:
-    TDelta();
     float update(float V);
-    void print(){for(int i=0; i<CNT; i++) Serial.printf("%0.2f ", data[i]); Serial.printf("\r\n");}
+    uint32_t init(uint32_t C);
 };

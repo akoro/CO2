@@ -347,6 +347,23 @@ void _format_(ArgList& L, Stream& S)
   S.println(F(" done"));
 }
 
+// инициализация кольцевого буфера в памяти RTC
+void _init_(ArgList& L, Stream& S)
+{
+  String p = L.getNextArg();
+  uint32_t C;
+  if(p.length())
+  {
+    C = p.toInt();
+    if(C<3 || C>60)
+    {
+      C = 5;
+      S.println(F("! ring buffer size: 5"));
+    }
+  }
+  S.printf("ring buffer size: %d\n", delta.init(C));
+}
+
 // задать SSID сети
 void _ssid_(ArgList& L, Stream& S)
 {
@@ -534,6 +551,7 @@ void setup()
   con.onCmd("period",  _period_);
   con.onCmd("timeout", _timeout_);
   con.onCmd("reset",   [](ArgList&, Stream& S){ESP.reset();});
+  con.onCmd("init",    _init_);
 
   tel.onCmd("save",    _save_);
   tel.onCmd("ind",     _ind_);
