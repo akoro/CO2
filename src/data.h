@@ -36,4 +36,5 @@ class TDelta
   public:
     float update(float V);
     uint32_t init(uint32_t C);
+    void print();
 };

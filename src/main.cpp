@@ -506,6 +506,7 @@ void _info_(ArgList& L, Stream& S)
   S.printf("SDK: %s, Core: %s\r\n",ESP.getSdkVersion(), ESP.getCoreVersion().c_str());
   S.printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
   S.print(F("Compiled at ")); S.println(F(__TIMESTAMP__));
+  delta.print();
 }
   
 // вкл./выкл. индикатор

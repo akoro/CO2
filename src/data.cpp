@@ -154,3 +154,19 @@ uint32_t TDelta::init(uint32_t C)
   return C;
 }
 
+void TDelta::print()
+{
+  uint32_t idx;
+  uint32_t CNT;
+  float V;
+  ESP.rtcUserMemoryRead(RTCOFFSET, &CNT, 4);
+  ESP.rtcUserMemoryRead(RTCOFFSET+4, &idx, 4);
+  Serial.printf("C=%d i=%d\r\n",CNT,idx);
+  for(uint32_t i=0; i<CNT; i++)
+  {
+    if(i%20==0) Serial.println();
+    ESP.rtcUserMemoryRead(RTCOFFSET+4+4+4*i, (uint32_t*)&V, 4);
+    Serial.printf(" %0.2f",V);
+  }
+  Serial.println();
+}
