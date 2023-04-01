@@ -69,6 +69,8 @@ Filter1 FVoltage(4.0);
 
 TDelta delta;
 
+uint32_t Counter = 0;
+
 Bounce Button1, Button2;
 Console con;
 Telnet  tel;
@@ -300,6 +302,8 @@ void publish(void)
   else
     sprintf(buff, "%0.2f", DPress*Coeff_P);
   mqtt.publish("base/state/dpr", buff);
+  sprintf(buff, "%d", Counter++);
+  mqtt.publish("base/state/counter", buff);
 //  mqtt.publish("base/update", "0");
 }
 
@@ -506,6 +510,7 @@ void _info_(ArgList& L, Stream& S)
   S.printf("SDK: %s, Core: %s\r\n",ESP.getSdkVersion(), ESP.getCoreVersion().c_str());
   S.printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
   S.print(F("Compiled at ")); S.println(F(__TIMESTAMP__));
+  S.printf("Counter: %d\r\n", Counter);
   delta.print();
 }
   
