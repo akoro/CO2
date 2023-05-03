@@ -286,25 +286,20 @@ bool DoMeasurements()
 
 void publish(void)
 {
-  char buff[40];
-  sprintf(buff, "%0.1f", Temperature);
-  mqtt.publish("base/state/temperature", buff);
-  sprintf(buff, "%0.0f", Humidity);
-  mqtt.publish("base/state/humidity", buff);
-  sprintf(buff, "%0.2f", Voltage);
-  mqtt.publish("base/state/volt", buff);
-  sprintf(buff, "%0.2f", Pressure*Coeff_P);
-  mqtt.publish("base/state/pressure", buff);
-  sprintf(buff, "%d", co2);
-  mqtt.publish("base/state/co2", buff);
-  if(DPress > 0)
-    sprintf(buff, "+%0.2f", DPress*Coeff_P);
-  else
-    sprintf(buff, "%0.2f", DPress*Coeff_P);
-  mqtt.publish("base/state/dpr", buff);
-  sprintf(buff, "%d", Counter++);
-  mqtt.publish("base/state/counter", buff);
-//  mqtt.publish("base/update", "0");
+  char buff[256];
+  char s;
+
+  sprintf(buff,"{\"cnt\":%d,\"volt\":%0.2f}",
+    Counter++, Voltage
+    );
+  mqtt.publish("home/dev", buff);
+
+  if(DPress > 0) s='+'; else if(DPress < 0) s='-'; else s=' ';
+  sprintf(buff, "{\"tem\":%0.1f,\"hum\":%0.0f,\"prs\":%0.2f,\"dpr\":%c%0.2f,\"co2\":%d}", 
+    Temperature, Humidity, Pressure*Coeff_P, s, abs(DPress*Coeff_P), co2
+    );
+  mqtt.publish("home/env", buff);
+
 }
 
 void drawBoot(char const * msg) 
@@ -355,7 +350,7 @@ void _format_(ArgList& L, Stream& S)
 void _init_(ArgList& L, Stream& S)
 {
   String p = L.getNextArg();
-  uint32_t C;
+  uint32_t C=32;
   if(p.length())
   {
     C = p.toInt();
