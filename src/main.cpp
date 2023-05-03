@@ -174,7 +174,6 @@ void CheckPower(void)
     u8g2.setPowerSave(1);
     char buff[30];
     sprintf(buff, "V=%0.2fV", Voltage);
-//    Blynk.email("Voltage low", buff);
     ESP.deepSleep(600000000); // засыпаем на 10 минут
   }
 }
@@ -240,7 +239,6 @@ void draw(int Progress)
   // Соединение
   x=119;
   y=0;
-//  if(Blynk.connected())
   {
     const byte bm[8] = {0xFF,0x00,0x7E,0x00,0x3C,0x00,0x18,0x18};
     u8g2.drawBitmap(x,y,1,8,bm);
@@ -299,7 +297,6 @@ void publish(void)
     Temperature, Humidity, Pressure*Coeff_P, s, abs(DPress*Coeff_P), co2
     );
   mqtt.publish("home/env", buff);
-
 }
 
 void drawBoot(char const * msg) 
@@ -520,14 +517,13 @@ void _ind_(ArgList& L, Stream& S)
 
 void callback(char* topic, byte* payload, unsigned int length) 
 {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i = 0; i < length; i++) 
+  Serial.print("Message arrived topic: \"");  Serial.print(topic);  Serial.print("\" payload: \"");
+  for (unsigned int i = 0; i < length; i++) 
   {
     Serial.print((char)payload[i]);
   }
-  Serial.println();
+  Serial.println("\"");
+  Indicator(1);
 }
 
 void setup() 
@@ -654,7 +650,6 @@ void setup()
     else
     {
       Serial.print(F(" connected ")); Serial.println(WiFi.localIP());
-//      Blynk.connect(5000);
       drawBoot("+connected");
     }
   }
@@ -689,7 +684,7 @@ void loop()
     if(mqtt.connect(cfg.mqtt_id)) 
     {
       Serial.println("connected");
-      mqtt.subscribe("base/update");
+      mqtt.subscribe("home/display");
 //      mqtt.subscribe("aqua/relay/valve");
     } 
     else 
