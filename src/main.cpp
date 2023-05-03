@@ -293,7 +293,7 @@ void publish(void)
   mqtt.publish("home/dev", buff);
 
   if(DPress > 0) s='+'; else if(DPress < 0) s='-'; else s=' ';
-  sprintf(buff, "{\"tem\":%0.1f,\"hum\":%0.0f,\"prs\":%0.2f,\"dpr\":%c%0.2f,\"co2\":%d}", 
+  sprintf(buff, "{\"tem\":%0.1f,\"hum\":%0.0f,\"prs\":%0.2f,\"dpr\":\"%c%0.2f\",\"co2\":%d}", 
     Temperature, Humidity, Pressure*Coeff_P, s, abs(DPress*Coeff_P), co2
     );
   mqtt.publish("home/env", buff);
