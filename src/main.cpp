@@ -523,7 +523,7 @@ void callback(char* topic, byte* payload, unsigned int length)
     Serial.print((char)payload[i]);
   }
   Serial.println("\"");
-  Indicator(1);
+  Indicator((char)payload[0]=='1');
 }
 
 void setup() 
