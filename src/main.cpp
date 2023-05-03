@@ -4,7 +4,6 @@
 - температура,
 - относительная влажность,
 - давление.
-На основе технологии Blynk. (http://blynk.cc)
 Версия 0.1 2019.11.04
            2019.12.01
            2019.12.17 updates
@@ -158,6 +157,7 @@ void readBME280(void)
     Humidity    = bme.readHumidity();
     Pressure    = bme.readPressure();
     Temperature = bme.readTemperature();
+    DPress = Pressure - delta.update(Pressure);
   }
 }
 
@@ -256,7 +256,6 @@ bool DoMeasurements()
     CheckPower();
     readCO2();
     readBME280();
-    DPress = Pressure - delta.update(Pressure);
     
     if(!con.busy())
     {
@@ -287,8 +286,9 @@ void publish(void)
   char buff[256];
   char s;
 
-  sprintf(buff,"{\"cnt\":%d,\"volt\":%0.2f}",
-    Counter++, Voltage
+  if(Indication) s='1'; else s='0';
+  sprintf(buff,"{\"cnt\":%d,\"volt\":%0.2f,\"ind\":%c}",
+    Counter++, Voltage, s
     );
   mqtt.publish("home/dev", buff);
 
@@ -523,7 +523,19 @@ void callback(char* topic, byte* payload, unsigned int length)
     Serial.print((char)payload[i]);
   }
   Serial.println("\"");
-  Indicator((char)payload[0]=='1');
+  switch((char)payload[0])
+  {
+  case '1': 
+    Indicator(1); break;
+  case '0': 
+    Indicator(0); break;
+  case '2': 
+    Voltage = FVoltage.Filter(analogRead(A0) / cfg.coeff_v);
+    readCO2();
+    readBME280();
+    publish(); 
+    break;
+  }
 }
 
 void setup() 
@@ -684,7 +696,7 @@ void loop()
     if(mqtt.connect(cfg.mqtt_id)) 
     {
       Serial.println("connected");
-      mqtt.subscribe("home/display");
+      mqtt.subscribe("home/control");
 //      mqtt.subscribe("aqua/relay/valve");
     } 
     else 
