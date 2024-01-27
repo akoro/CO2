@@ -10,6 +10,7 @@
            2020.11.15 updates
            2020.11.17 telnet added
            2023.01.04 go to MQTT...
+           2024.01.27 fix error, recompile
 */
 
 #include <ESP8266WiFi.h>
@@ -66,7 +67,7 @@ float Volage2      = 0;
 //Filter1 FHumidity(30);
 Filter1 FVoltage(4.0);
 
-TDelta delta;
+//TDelta delta;
 
 uint32_t Counter = 0;
 
@@ -157,14 +158,15 @@ void readBME280(void)
     Humidity    = bme.readHumidity();
     Pressure    = bme.readPressure();
     Temperature = bme.readTemperature();
-    DPress = Pressure - delta.update(Pressure);
+//    DPress = Pressure - delta.update(Pressure);
+    DPress = 0;
   }
 }
 
 void CheckPower(void)
 {
   Voltage = FVoltage.Filter(analogRead(A0) / cfg.coeff_v);
-  if(Voltage > 3.7)
+  if(Voltage > 3.3)
   {
     digitalWrite(CO2_POW, HIGH);
   }
@@ -357,7 +359,7 @@ void _init_(ArgList& L, Stream& S)
       S.println(F("! ring buffer size: 5"));
     }
   }
-  S.printf("ring buffer size: %d\n", delta.init(C));
+//  S.printf("ring buffer size: %d\n", delta.init(C));
 }
 
 // задать SSID сети
@@ -503,7 +505,7 @@ void _info_(ArgList& L, Stream& S)
   S.printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
   S.print(F("Compiled at ")); S.println(F(__TIMESTAMP__));
   S.printf("Counter: %d\r\n", Counter);
-  delta.print();
+//  delta.print();
 }
   
 // вкл./выкл. индикатор
@@ -574,7 +576,7 @@ void setup()
   
   swSer.begin(9600);
 
-  // Power ON of CO2 sensor
+  // Power OFF of CO2 sensor
   pinMode(CO2_POW, OUTPUT);
   digitalWrite(CO2_POW, LOW);
 
